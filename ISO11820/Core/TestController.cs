@@ -173,6 +173,9 @@ public class TestController
         if (_daqWorker.ElapsedSeconds > 0)
         {
             _daqWorker.AddMessage("用户手动停止记录");
+            // 先记录试验时长，确保"试验记录"按钮可用
+            if (CurrentTest != null)
+                CurrentTest.TotalTestTime = _daqWorker.ElapsedSeconds;
             TransitionTo(TestState.Complete);
         }
         else

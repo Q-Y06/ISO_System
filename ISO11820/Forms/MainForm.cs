@@ -53,8 +53,7 @@ public partial class MainForm : Form
         WireEvents();
         ShowInitialTemperatures();
         UpdateButtonStates();
-        // 立即启动仿真器（Idle时温度保持不变，仅广播当前值用于UI显示）
-        _ctx.DaqWorker.Start();
+        // 不立即启动——等用户点击"开始升温"或创建试验时才启动
     }
 
     private void ShowInitialTemperatures()
@@ -190,7 +189,7 @@ public partial class MainForm : Form
         btnStartRecord.Click += (s, e) => { if (_tc.StartRecording()) UpdateButtonStates(); };
         btnStopRecord.Click += (s, e) => { if (_tc.StopRecording()) UpdateButtonStates(); };
         btnTestRecord.Click += (s, e) => OpenTestRecordDialog();
-        btnSettings.Click += (s, e) => MessageBox.Show("参数设置功能开发中", "提示");
+        btnSettings.Click += (s, e) => { using var dlg = new SettingsForm(); dlg.ShowDialog(); };
 
         panel.Controls.AddRange(new Control[] { btnNewTest, btnStartHeat, btnStopHeat, btnStartRecord, btnStopRecord, btnTestRecord, btnSettings });
         return panel;
