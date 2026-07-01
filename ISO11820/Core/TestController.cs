@@ -17,6 +17,7 @@ public class TestController
 
     private int _stableTickCount;
     private readonly List<double> _pidOutputQueue = new();
+    private readonly List<double> _driftHistory = new(); // 只在稳定范围内累积，用于温漂计算
 
     public event EventHandler<string>? StateChanged;
 
@@ -34,25 +35,36 @@ public class TestController
         if (State == TestState.Idle || CurrentTest == null) return;
 
         double tf1 = _daqWorker.Temperatures["TF1"];
-        double drift = _daqWorker.GetCurrentDrift();
-        bool isDriftValid = !double.IsNaN(drift);
         double maxDrift = _simConfig.MaxTemperatureDriftPerTenMinutes;
+        double target = _simConfig.TargetFurnaceTemp;
+        double threshold = _simConfig.StableThreshold;
 
         if (State == TestState.Preparing)
         {
-            bool inRange = tf1 >= (_simConfig.TargetFurnaceTemp - _simConfig.StableThreshold)
-                        && tf1 <= (_simConfig.TargetFurnaceTemp + _simConfig.StableThreshold);
+            bool inRange = tf1 >= (target - threshold) && tf1 <= (target + threshold);
 
             if (inRange)
             {
                 _stableTickCount++;
-                if (_stableTickCount > 3 && isDriftValid && Math.Abs(drift) <= maxDrift)
+                _driftHistory.Add(tf1);
+                if (_driftHistory.Count > 600) _driftHistory.RemoveAt(0);
+
+                // 需要足够的稳定数据和足够的 tick 数
+                if (_stableTickCount > 3 && _driftHistory.Count >= 10)
                 {
-                    TransitionTo(TestState.Ready);
-                    _daqWorker.AddMessage("温度已稳定，可以开始记录");
+                    double drift = DriftCalculator.CalculateDrift(_driftHistory);
+                    if (!double.IsNaN(drift) && Math.Abs(drift) <= maxDrift)
+                    {
+                        TransitionTo(TestState.Ready);
+                        _daqWorker.AddMessage("温度已稳定，可以开始记录");
+                    }
                 }
             }
-            else { _stableTickCount = 0; }
+            else
+            {
+                _stableTickCount = 0;
+                _driftHistory.Clear();
+            }
 
             _pidOutputQueue.Add(tf1);
             if (_pidOutputQueue.Count > 600) _pidOutputQueue.RemoveAt(0);
@@ -63,11 +75,16 @@ public class TestController
             _pidOutputQueue.Add(tf1);
             if (_pidOutputQueue.Count > 600) _pidOutputQueue.RemoveAt(0);
 
-            bool inRange = tf1 >= (_simConfig.TargetFurnaceTemp - _simConfig.StableThreshold)
-                        && tf1 <= (_simConfig.TargetFurnaceTemp + _simConfig.StableThreshold);
-            if (!inRange)
+            bool inRange = tf1 >= (target - threshold) && tf1 <= (target + threshold);
+            if (inRange)
+            {
+                _driftHistory.Add(tf1);
+                if (_driftHistory.Count > 600) _driftHistory.RemoveAt(0);
+            }
+            else
             {
                 _stableTickCount = 0;
+                _driftHistory.Clear();
                 TransitionTo(TestState.Preparing);
             }
         }
@@ -107,7 +124,7 @@ public class TestController
 
         if (CurrentTest.DurationMode == "Standard" && secs >= 1800 && secs % 300 == 0)
         {
-            double drift = _daqWorker.GetCurrentDrift();
+            double drift = DriftCalculator.CalculateDrift(_driftHistory);
             double maxDrift = _simConfig.MaxTemperatureDriftPerTenMinutes;
             if (!double.IsNaN(drift) && Math.Abs(drift) <= maxDrift)
             {
@@ -171,6 +188,7 @@ public class TestController
         TemperatureHistory.Clear();
         _stableTickCount = 0;
         _pidOutputQueue.Clear();
+        _driftHistory.Clear();
     }
 
     public void SaveTestRecord(double postWeight, int hasFlame, int flameStartTime,
@@ -208,6 +226,7 @@ public class TestController
         TemperatureHistory.Clear();
         _stableTickCount = 0;
         _pidOutputQueue.Clear();
+        _driftHistory.Clear();
 
         if (State == TestState.Complete)
             TransitionTo(TestState.Preparing);
