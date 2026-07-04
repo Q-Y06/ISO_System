@@ -20,11 +20,9 @@ public class ExportService
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
     }
 
-    private static string AppDir => AppDomain.CurrentDomain.BaseDirectory;
-
-    private string BaseDir => Path.GetFullPath(Path.Combine(AppDir, _config["FileStorage:BaseDirectory"] ?? "Data\\ISO11820"));
-    private string TestDataDir => Path.GetFullPath(Path.Combine(AppDir, _config["FileStorage:TestDataDirectory"] ?? "Data\\ISO11820\\TestData"));
-    private string ReportDir => Path.GetFullPath(Path.Combine(AppDir, _config["Report:OutputDirectory"] ?? "Data\\ISO11820\\Reports"));
+    private string BaseDir => _config["FileStorage:BaseDirectory"] ?? "D:\\ISO11820";
+    private string TestDataDir => _config["FileStorage:TestDataDirectory"] ?? "D:\\ISO11820\\TestData";
+    private string ReportDir => _config["Report:OutputDirectory"] ?? "D:\\ISO11820\\Reports";
 
     public string ExportCsv(TestMaster tm, List<TemperatureData> tempData)
     {
