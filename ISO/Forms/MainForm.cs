@@ -28,6 +28,7 @@ public partial class MainForm : Form
     private PlotModel plotModel = null!;
     private LineSeries seriesTF1 = null!, seriesTF2 = null!, seriesTS = null!, seriesTC = null!;
     private readonly ToolTip _chartTooltip = new();
+    private int _tickCounter;
 
     // Curve visibility checkboxes
     private CheckBox cbTF1 = null!, cbTF2 = null!, cbTS = null!, cbTC = null!;
@@ -490,31 +491,63 @@ public partial class MainForm : Form
     {
         if (plotView.ActualModel == null) return;
 
-        var sp = new ScreenPoint(e.X, e.Y);
-        TrackerHitResult? best = null;
-        double bestDist = 40;
+        var model = plotView.ActualModel;
+        // 修正：减去图表区域偏移，得到 plot-area 内的坐标
+        double px = e.X - model.PlotArea.Left;
+        double py = e.Y - model.PlotArea.Top;
 
-        foreach (var series in plotView.ActualModel.Series.OfType<LineSeries>())
+        // 用轴直接反算数据坐标，再找最近点（不受 zoom/pan 影响）
+        double bestDist = double.MaxValue;
+        string bestTip = "";
+
+        foreach (var series in model.Series.OfType<LineSeries>())
         {
             if (!series.IsVisible || series.Points.Count == 0) continue;
-            var hit = series.GetNearestPoint(sp, false);
-            if (hit == null) continue;
 
-            double dx = hit.Position.X - e.X;
-            double dy = hit.Position.Y - e.Y;
-            double dist = Math.Sqrt(dx * dx + dy * dy);
+            var xAxis = series.XAxis ?? model.DefaultXAxis;
+            var yAxis = series.YAxis ?? model.DefaultYAxis;
+            if (xAxis == null || yAxis == null) continue;
 
-            if (dist < bestDist)
+            // 屏幕坐标 → 数据坐标
+            double dataX = xAxis.InverseTransform(px);
+            double dataY = yAxis.InverseTransform(py);
+
+            // 在数据空间找最近点
+            double minDx = (xAxis.ActualMaximum - xAxis.ActualMinimum) / 400; // ~1.5s 容差
+            double minDy = (yAxis.ActualMaximum - yAxis.ActualMinimum) / 250; // ~3°C 容差
+            double bestIdxDist = double.MaxValue;
+
+            for (int i = 0; i < series.Points.Count; i++)
             {
-                bestDist = dist;
-                best = hit;
+                var pt = series.Points[i];
+                double ddx = (pt.X - dataX) / minDx;
+                double ddy = (pt.Y - dataY) / minDy;
+                double ndist = ddx * ddx + ddy * ddy;
+                if (ndist < bestIdxDist) bestIdxDist = ndist;
+            }
+
+            if (bestIdxDist < 1.0 && bestIdxDist < bestDist)
+            {
+                bestDist = bestIdxDist;
+                // 找到最近点后再查一次
+                for (int i = 0; i < series.Points.Count; i++)
+                {
+                    var pt = series.Points[i];
+                    double ddx = (pt.X - dataX) / minDx;
+                    double ddy = (pt.Y - dataY) / minDy;
+                    double ndist = ddx * ddx + ddy * ddy;
+                    if (Math.Abs(ndist - bestIdxDist) < 0.001)
+                    {
+                        bestTip = $"{series.Title}\n━━━━━━\n时间: {pt.X:F0} s\n温度: {pt.Y:F1} °C";
+                        break;
+                    }
+                }
             }
         }
 
-        if (best != null)
+        if (!string.IsNullOrEmpty(bestTip))
         {
-            var dp = best.DataPoint;
-            _chartTooltip.SetToolTip(plotView, $"{best.Series!.Title}\n━━━━━━\n时间: {dp.X:F0} s\n温度: {dp.Y:F1} °C");
+            _chartTooltip.SetToolTip(plotView, bestTip);
             _chartTooltip.Active = true;
         }
         else
@@ -532,6 +565,7 @@ public partial class MainForm : Form
         seriesTC.Points.Clear();
         plotModel.Axes[0].Minimum = 0;
         plotModel.Axes[0].Maximum = 600;
+        _tickCounter = 0;
         plotModel.InvalidatePlot(true);
     }
 
@@ -839,16 +873,21 @@ public partial class MainForm : Form
         seriesTS.Points.Add(new DataPoint(t, temps["TS"]));
         seriesTC.Points.Add(new DataPoint(t, temps["TC"]));
 
+        bool axisChanged = false;
         if (t > 600)
         {
             plotModel.Axes[0].Minimum = t - 600;
             plotModel.Axes[0].Maximum = t;
+            axisChanged = true;
         }
 
         foreach (var s in new[] { seriesTF1, seriesTF2, seriesTS, seriesTC })
             while (s.Points.Count > 800) s.Points.RemoveAt(0);
 
-        plotModel.InvalidatePlot(true);
+        // 轴变了或每60次tick才全刷新，否则只重绘（流畅不卡）
+        _tickCounter++;
+        bool fullRefresh = axisChanged || (_tickCounter % 60 == 0);
+        plotModel.InvalidatePlot(fullRefresh);
 
         // 日志消息
         foreach (var msg in e.Messages)
