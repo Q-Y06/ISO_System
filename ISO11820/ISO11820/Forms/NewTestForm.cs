@@ -1,3 +1,4 @@
+using ISO11820.Helpers;
 using ISO11820.Models;
 using AppContext = ISO11820.Global.AppContext;
 
@@ -29,7 +30,8 @@ public partial class NewTestForm : Form
         this.StartPosition = FormStartPosition.CenterParent;
         this.FormBorderStyle = FormBorderStyle.FixedDialog;
         this.MaximizeBox = false;
-        this.BackColor = Color.FromArgb(240, 240, 240);
+        this.BackColor = ThemeColors.BgDark;
+        this.ForeColor = ThemeColors.TextPrimary;
 
         int y = 15;
         int leftX = 130;
@@ -45,32 +47,65 @@ public partial class NewTestForm : Form
         AddLabel("试验前质量 (g):", 15, y); txtPreWeight = AddTextBox(leftX, y, 100); txtPreWeight.Text = "50.0"; y += 32;
 
         AddLabel("时长模式:", 15, y);
-        cmbDurationMode = new ComboBox { Location = new Point(leftX, y - 2), Size = new Size(120, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+        cmbDurationMode = new ComboBox
+        {
+            Location = new Point(leftX, y - 2), Size = new Size(120, 24),
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            BackColor = ThemeColors.BgInput, ForeColor = ThemeColors.TextPrimary,
+            FlatStyle = FlatStyle.Flat
+        };
         cmbDurationMode.Items.AddRange(new[] { "标准 60 分钟", "自定义" });
         cmbDurationMode.SelectedIndex = 0;
         this.Controls.Add(cmbDurationMode);
         y += 32;
 
         AddLabel("自定义时长 (秒):", 15, y);
-        nudTargetDuration = new NumericUpDown { Location = new Point(leftX, y - 2), Size = new Size(100, 24), Minimum = 60, Maximum = 7200, Value = 3600, Enabled = false };
+        nudTargetDuration = new NumericUpDown
+        {
+            Location = new Point(leftX, y - 2), Size = new Size(100, 24),
+            Minimum = 60, Maximum = 7200, Value = 3600, Enabled = false,
+            BackColor = ThemeColors.BgInput, ForeColor = ThemeColors.TextPrimary
+        };
         this.Controls.Add(nudTargetDuration);
         cmbDurationMode.SelectedIndexChanged += (s, e) => nudTargetDuration.Enabled = cmbDurationMode.SelectedIndex == 1;
         y += 32;
 
         AddLabel("操作员:", 15, y);
-        lblOperator = new Label { Text = AppContext.Instance.CurrentOperator, Location = new Point(leftX, y), Size = new Size(200, 22), Font = new Font("Microsoft YaHei", 10, FontStyle.Bold) };
+        lblOperator = new Label
+        {
+            Text = AppContext.Instance.CurrentOperator,
+            Location = new Point(leftX, y), Size = new Size(200, 22),
+            Font = new Font("Microsoft YaHei", 10, FontStyle.Bold),
+            ForeColor = ThemeColors.TextPrimary
+        };
         this.Controls.Add(lblOperator);
         y += 32;
 
         AddLabel("设备信息:", 15, y);
-        lblApparatus = new Label { Text = "--", Location = new Point(leftX, y), Size = new Size(320, 22), Font = new Font("Microsoft YaHei", 9) };
+        lblApparatus = new Label
+        {
+            Text = "--", Location = new Point(leftX, y), Size = new Size(320, 22),
+            Font = new Font("Microsoft YaHei", 9),
+            ForeColor = ThemeColors.TextSecondary
+        };
         this.Controls.Add(lblApparatus);
         y += 42;
 
-        btnOK = new Button { Text = "创建试验", Location = new Point(120, y), Size = new Size(110, 38), BackColor = Color.FromArgb(0, 122, 204), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+        btnOK = new Button
+        {
+            Text = "创建试验", Location = new Point(120, y), Size = new Size(110, 38),
+            BackColor = ThemeColors.LoginBlue, ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat
+        };
         btnOK.FlatAppearance.BorderSize = 0;
         btnOK.Click += BtnOK_Click;
-        btnCancel = new Button { Text = "取消", Location = new Point(250, y), Size = new Size(100, 38), FlatStyle = FlatStyle.Flat };
+        btnCancel = new Button
+        {
+            Text = "取消", Location = new Point(250, y), Size = new Size(100, 38),
+            BackColor = ThemeColors.LoginGray, ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat
+        };
+        btnCancel.FlatAppearance.BorderSize = 0;
         btnCancel.Click += (s, e) => this.DialogResult = DialogResult.Cancel;
 
         this.Controls.Add(btnOK);
@@ -79,12 +114,24 @@ public partial class NewTestForm : Form
 
     private void AddLabel(string text, int x, int y)
     {
-        this.Controls.Add(new Label { Text = text, Location = new Point(x, y), Size = new Size(110, 22), TextAlign = ContentAlignment.MiddleRight, Font = new Font("Microsoft YaHei", 9) });
+        this.Controls.Add(new Label
+        {
+            Text = text, Location = new Point(x, y), Size = new Size(110, 22),
+            TextAlign = ContentAlignment.MiddleRight,
+            Font = new Font("Microsoft YaHei", 9),
+            ForeColor = ThemeColors.TextPrimary
+        });
     }
 
     private TextBox AddTextBox(int x, int y, int width)
     {
-        var tb = new TextBox { Location = new Point(x, y), Size = new Size(width, 24), Font = new Font("Microsoft YaHei", 9) };
+        var tb = new TextBox
+        {
+            Location = new Point(x, y), Size = new Size(width, 24),
+            Font = new Font("Microsoft YaHei", 9),
+            BackColor = ThemeColors.BgInput, ForeColor = ThemeColors.TextPrimary,
+            BorderStyle = BorderStyle.FixedSingle
+        };
         this.Controls.Add(tb);
         return tb;
     }

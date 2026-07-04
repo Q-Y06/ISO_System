@@ -1,3 +1,4 @@
+using ISO11820.Helpers;
 using AppContext = ISO11820.Global.AppContext;
 
 namespace ISO11820.Forms;
@@ -22,14 +23,14 @@ public partial class LoginForm : Form
         this.StartPosition = FormStartPosition.CenterScreen;
         this.FormBorderStyle = FormBorderStyle.FixedDialog;
         this.MaximizeBox = false;
-        this.BackColor = Color.FromArgb(30, 30, 30);
-        this.ForeColor = Color.White;
+        this.BackColor = ThemeColors.BgDark;
+        this.ForeColor = ThemeColors.TextPrimary;
 
         lblTitle = new Label
         {
             Text = "ISO 11820 建筑材料不燃性试验系统",
             Font = new Font("Microsoft YaHei", 14, FontStyle.Bold),
-            ForeColor = Color.White,
+            ForeColor = ThemeColors.TextPrimary,
             Size = new Size(380, 35),
             Location = new Point(20, 20),
             TextAlign = ContentAlignment.MiddleCenter
@@ -38,7 +39,7 @@ public partial class LoginForm : Form
         gbRole = new GroupBox
         {
             Text = "选择角色",
-            ForeColor = Color.White,
+            ForeColor = ThemeColors.TextPrimary,
             Font = new Font("Microsoft YaHei", 10),
             Size = new Size(360, 65),
             Location = new Point(20, 65)
@@ -50,7 +51,7 @@ public partial class LoginForm : Form
             Location = new Point(30, 28),
             Size = new Size(80, 22),
             Checked = true,
-            ForeColor = Color.White,
+            ForeColor = ThemeColors.TextPrimary,
             Font = new Font("Microsoft YaHei", 10)
         };
 
@@ -59,7 +60,7 @@ public partial class LoginForm : Form
             Text = "试验员",
             Location = new Point(130, 28),
             Size = new Size(80, 22),
-            ForeColor = Color.White,
+            ForeColor = ThemeColors.TextPrimary,
             Font = new Font("Microsoft YaHei", 10)
         };
 
@@ -69,7 +70,7 @@ public partial class LoginForm : Form
         lblPassword = new Label
         {
             Text = "输入密码:",
-            ForeColor = Color.White,
+            ForeColor = ThemeColors.TextPrimary,
             Font = new Font("Microsoft YaHei", 10),
             Location = new Point(20, 145),
             Size = new Size(80, 25)
@@ -80,8 +81,8 @@ public partial class LoginForm : Form
             Location = new Point(110, 143),
             Size = new Size(200, 28),
             PasswordChar = '*',
-            BackColor = Color.FromArgb(50, 50, 50),
-            ForeColor = Color.White,
+            BackColor = ThemeColors.BgInput,
+            ForeColor = ThemeColors.TextPrimary,
             BorderStyle = BorderStyle.FixedSingle,
             Font = new Font("Microsoft YaHei", 10)
         };
@@ -92,7 +93,7 @@ public partial class LoginForm : Form
             Location = new Point(80, 200),
             Size = new Size(100, 38),
             Font = new Font("Microsoft YaHei", 10, FontStyle.Bold),
-            BackColor = Color.FromArgb(0, 122, 204),
+            BackColor = ThemeColors.LoginBlue,
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat
         };
@@ -105,7 +106,7 @@ public partial class LoginForm : Form
             Location = new Point(220, 200),
             Size = new Size(100, 38),
             Font = new Font("Microsoft YaHei", 10),
-            BackColor = Color.FromArgb(80, 80, 80),
+            BackColor = ThemeColors.LoginGray,
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat
         };

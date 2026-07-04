@@ -1,4 +1,5 @@
 using ISO11820.Core;
+using ISO11820.Helpers;
 using ISO11820.Models;
 using ISO11820.Services;
 using OxyPlot;
@@ -82,26 +83,26 @@ public partial class MainForm : Form
         this.Size = new Size(1280, 820);
         this.StartPosition = FormStartPosition.CenterScreen;
         this.MinimumSize = new Size(1024, 700);
-        this.BackColor = Color.FromArgb(30, 30, 30);
-        this.ForeColor = Color.White;
+        this.BackColor = ThemeColors.BgDark;
+        this.ForeColor = ThemeColors.TextPrimary;
 
         tabControl = new TabControl { Dock = DockStyle.Fill, Font = new Font("Microsoft YaHei", 10) };
 
         // --- Tab 1: Main ---
         tabMain = new TabPage("试验控制");
-        tabMain.BackColor = Color.FromArgb(30, 30, 30);
+        tabMain.BackColor = ThemeColors.BgDark;
 
         var tempPanel = CreateTemperaturePanel();
         var statusPanel = CreateStatusPanel();
         var buttonPanel = CreateButtonPanel();
 
-        plotView = new PlotView { Dock = DockStyle.Fill, BackColor = Color.FromArgb(30, 30, 30) };
+        plotView = new PlotView { Dock = DockStyle.Fill, BackColor = ThemeColors.BgDark };
 
         rtbLog = new RichTextBox
         {
             Dock = DockStyle.Fill,
-            BackColor = Color.FromArgb(15, 15, 15),
-            ForeColor = Color.FromArgb(200, 200, 200),
+            BackColor = ThemeColors.BgLog,
+            ForeColor = ThemeColors.TextSecondary,
             Font = new Font("Consolas", 10),
             ReadOnly = true,
             WordWrap = true,
@@ -113,18 +114,18 @@ public partial class MainForm : Form
         {
             Dock = DockStyle.Top,
             Height = 28,
-            BackColor = Color.FromArgb(45, 45, 45)
+            BackColor = ThemeColors.BgMedium
         };
         logTitlePanel.Controls.Add(new Label
         {
             Text = "▌ 系统消息",
-            ForeColor = Color.FromArgb(180, 180, 180),
+            ForeColor = ThemeColors.TextMuted,
             Font = new Font("Microsoft YaHei", 9, FontStyle.Bold),
             Location = new Point(8, 4),
             Size = new Size(200, 20)
         });
 
-        var topPanel = new Panel { Dock = DockStyle.Top, Height = 160, BackColor = Color.FromArgb(30, 30, 30) };
+        var topPanel = new Panel { Dock = DockStyle.Top, Height = 160, BackColor = ThemeColors.BgDark };
         topPanel.Controls.Add(tempPanel);
         topPanel.Controls.Add(statusPanel);
         topPanel.Controls.Add(buttonPanel);
@@ -147,12 +148,12 @@ public partial class MainForm : Form
 
         // --- Tab 2: Query ---
         tabQuery = new TabPage("记录查询");
-        tabQuery.BackColor = Color.FromArgb(30, 30, 30);
+        tabQuery.BackColor = ThemeColors.BgDark;
         BuildQueryTab();
 
         // --- Tab 3: Calibration ---
         tabCalibration = new TabPage("设备校准");
-        tabCalibration.BackColor = Color.FromArgb(30, 30, 30);
+        tabCalibration.BackColor = ThemeColors.BgDark;
         BuildCalibrationTab();
 
         tabControl.TabPages.Add(tabMain);
@@ -164,9 +165,9 @@ public partial class MainForm : Form
 
     private Panel CreateTemperaturePanel()
     {
-        var panel = new Panel { Location = new Point(10, 10), Size = new Size(750, 130), BackColor = Color.FromArgb(30, 30, 30) };
+        var panel = new Panel { Location = new Point(10, 10), Size = new Size(750, 130), BackColor = ThemeColors.BgDark };
         var labels = new[] { "炉温1", "炉温2", "表面温", "中心温", "校准温" };
-        var colors = new[] { Color.FromArgb(255, 80, 80), Color.FromArgb(255, 160, 60), Color.FromArgb(80, 200, 80), Color.FromArgb(80, 180, 255), Color.FromArgb(200, 180, 100) };
+        var colors = new[] { ThemeColors.TempFurnace1, ThemeColors.TempFurnace2, ThemeColors.TempSurface, ThemeColors.TempCenter, ThemeColors.TempCal };
         var lbls = new Label[5];
 
         for (int i = 0; i < 5; i++)
@@ -177,14 +178,14 @@ public partial class MainForm : Form
             {
                 Location = new Point(xPos, 0),
                 Size = new Size(135, 125),
-                BackColor = Color.FromArgb(20, 20, 20),
+                BackColor = ThemeColors.BgLed,
                 BorderStyle = BorderStyle.FixedSingle
             };
             // 通道名称
             var lblName = new Label
             {
                 Text = labels[i],
-                ForeColor = Color.FromArgb(180, 180, 180),
+                ForeColor = ThemeColors.TextMuted,
                 Font = new Font("Microsoft YaHei", 9, FontStyle.Bold),
                 Location = new Point(0, 5),
                 Size = new Size(133, 20),
@@ -195,7 +196,7 @@ public partial class MainForm : Form
             {
                 Text = "0.0 °C",
                 ForeColor = colors[i],
-                BackColor = Color.FromArgb(10, 10, 10),
+                BackColor = ThemeColors.BgLedValue,
                 Font = new Font("Consolas", 24, FontStyle.Bold),
                 Location = new Point(5, 30),
                 Size = new Size(123, 45),
@@ -205,7 +206,7 @@ public partial class MainForm : Form
             var lblChannel = new Label
             {
                 Text = $"CH{i + 1}",
-                ForeColor = Color.FromArgb(100, 100, 100),
+                ForeColor = ThemeColors.TextGray,
                 Font = new Font("Consolas", 8),
                 Location = new Point(0, 80),
                 Size = new Size(133, 18),
@@ -223,11 +224,11 @@ public partial class MainForm : Form
 
     private Panel CreateStatusPanel()
     {
-        var panel = new Panel { Location = new Point(770, 10), Size = new Size(240, 130), BackColor = Color.FromArgb(45, 45, 45) };
-        lblStatus = new Label { Text = "空闲", ForeColor = Color.White, Font = new Font("Microsoft YaHei", 14, FontStyle.Bold), Location = new Point(10, 10), Size = new Size(220, 30), TextAlign = ContentAlignment.MiddleCenter };
-        lblTimer = new Label { Text = "计时: 0 秒", ForeColor = Color.FromArgb(0, 200, 200), Font = new Font("Consolas", 18, FontStyle.Bold), Location = new Point(10, 45), Size = new Size(220, 35), TextAlign = ContentAlignment.MiddleCenter };
-        lblDrift = new Label { Text = "温漂: -- °C/10min", ForeColor = Color.Gray, Font = new Font("Microsoft YaHei", 10), Location = new Point(10, 85), Size = new Size(220, 20), TextAlign = ContentAlignment.MiddleCenter };
-        lblSample = new Label { Text = "样品: --", ForeColor = Color.Gray, Font = new Font("Microsoft YaHei", 9), Location = new Point(10, 107), Size = new Size(220, 18), TextAlign = ContentAlignment.MiddleCenter };
+        var panel = new Panel { Location = new Point(770, 10), Size = new Size(240, 130), BackColor = ThemeColors.BgMedium };
+        lblStatus = new Label { Text = "空闲", ForeColor = ThemeColors.TextPrimary, Font = new Font("Microsoft YaHei", 14, FontStyle.Bold), Location = new Point(10, 10), Size = new Size(220, 30), TextAlign = ContentAlignment.MiddleCenter };
+        lblTimer = new Label { Text = "计时: 0 秒", ForeColor = ThemeColors.StatusCyan, Font = new Font("Consolas", 18, FontStyle.Bold), Location = new Point(10, 45), Size = new Size(220, 35), TextAlign = ContentAlignment.MiddleCenter };
+        lblDrift = new Label { Text = "温漂: -- °C/10min", ForeColor = ThemeColors.TextSecondary, Font = new Font("Microsoft YaHei", 10), Location = new Point(10, 85), Size = new Size(220, 20), TextAlign = ContentAlignment.MiddleCenter };
+        lblSample = new Label { Text = "样品: --", ForeColor = ThemeColors.TextSecondary, Font = new Font("Microsoft YaHei", 9), Location = new Point(10, 107), Size = new Size(220, 18), TextAlign = ContentAlignment.MiddleCenter };
         panel.Controls.Add(lblStatus);
         panel.Controls.Add(lblTimer);
         panel.Controls.Add(lblDrift);
@@ -237,15 +238,15 @@ public partial class MainForm : Form
 
     private Panel CreateButtonPanel()
     {
-        var panel = new Panel { Location = new Point(1020, 10), Size = new Size(220, 130), BackColor = Color.FromArgb(30, 30, 30) };
+        var panel = new Panel { Location = new Point(1020, 10), Size = new Size(220, 130), BackColor = ThemeColors.BgDark };
 
-        btnNewTest = MkBtn("新建试验", new Point(5, 5), Color.FromArgb(60, 120, 200));
-        btnStartHeat = MkBtn("开始升温", new Point(5, 42), Color.FromArgb(200, 80, 60));
-        btnStopHeat = MkBtn("停止升温", new Point(115, 42), Color.FromArgb(180, 120, 60));
-        btnStartRecord = MkBtn("开始记录", new Point(5, 79), Color.FromArgb(40, 160, 80));
-        btnStopRecord = MkBtn("停止记录", new Point(115, 79), Color.FromArgb(160, 120, 60));
-        btnTestRecord = MkBtn("试验记录", new Point(5, 116), Color.FromArgb(140, 100, 180));
-        btnSettings = MkBtn("参数设置", new Point(115, 116), Color.FromArgb(120, 120, 120));
+        btnNewTest = MkBtn("新建试验", new Point(5, 5), ThemeColors.AccentBlue);
+        btnStartHeat = MkBtn("开始升温", new Point(5, 42), ThemeColors.AccentOrange);
+        btnStopHeat = MkBtn("停止升温", new Point(115, 42), ThemeColors.AccentYellow);
+        btnStartRecord = MkBtn("开始记录", new Point(5, 79), ThemeColors.AccentGreen);
+        btnStopRecord = MkBtn("停止记录", new Point(115, 79), ThemeColors.AccentYellow);
+        btnTestRecord = MkBtn("试验记录", new Point(5, 116), ThemeColors.AccentPurple);
+        btnSettings = MkBtn("参数设置", new Point(115, 116), ThemeColors.AccentDarkGray);
 
         btnNewTest.Click += (s, e) => OpenNewTestDialog();
         btnStartHeat.Click += (s, e) => { if (_tc.StartHeating()) { _ctx.DaqWorker.Start(); UpdateButtonStates(); } };
@@ -324,22 +325,22 @@ public partial class MainForm : Form
 
     private void BuildQueryTab()
     {
-        var topPanel = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = Color.FromArgb(40, 40, 40) };
+        var topPanel = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = ThemeColors.BgLight };
 
-        topPanel.Controls.Add(new Label { Text = "开始:", ForeColor = Color.White, Location = new Point(10, 15), Size = new Size(40, 22) });
+        topPanel.Controls.Add(new Label { Text = "开始:", ForeColor = ThemeColors.TextPrimary, Location = new Point(10, 15), Size = new Size(40, 22) });
         dtpStart = new DateTimePicker { Location = new Point(50, 12), Size = new Size(120, 24), Format = DateTimePickerFormat.Short };
-        topPanel.Controls.Add(new Label { Text = "结束:", ForeColor = Color.White, Location = new Point(180, 15), Size = new Size(40, 22) });
+        topPanel.Controls.Add(new Label { Text = "结束:", ForeColor = ThemeColors.TextPrimary, Location = new Point(180, 15), Size = new Size(40, 22) });
         dtpEnd = new DateTimePicker { Location = new Point(220, 12), Size = new Size(120, 24), Format = DateTimePickerFormat.Short };
-        topPanel.Controls.Add(new Label { Text = "样品:", ForeColor = Color.White, Location = new Point(350, 15), Size = new Size(40, 22) });
+        topPanel.Controls.Add(new Label { Text = "样品:", ForeColor = ThemeColors.TextPrimary, Location = new Point(350, 15), Size = new Size(40, 22) });
         txtQueryProduct = new TextBox { Location = new Point(390, 12), Size = new Size(100, 24) };
-        topPanel.Controls.Add(new Label { Text = "操作员:", ForeColor = Color.White, Location = new Point(500, 15), Size = new Size(55, 22) });
+        topPanel.Controls.Add(new Label { Text = "操作员:", ForeColor = ThemeColors.TextPrimary, Location = new Point(500, 15), Size = new Size(55, 22) });
         cmbQueryOperator = new ComboBox { Location = new Point(555, 12), Size = new Size(100, 24), DropDownStyle = ComboBoxStyle.DropDownList };
 
-        var btnQuery = new Button { Text = "查询", Location = new Point(670, 10), Size = new Size(80, 30), BackColor = Color.FromArgb(60, 120, 200), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+        var btnQuery = new Button { Text = "查询", Location = new Point(670, 10), Size = new Size(80, 30), BackColor = ThemeColors.AccentBlue, ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
         btnQuery.Click += (s, e) => RunQuery();
-        var btnExport = new Button { Text = "导出CSV", Location = new Point(760, 10), Size = new Size(90, 30), BackColor = Color.FromArgb(40, 160, 80), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+        var btnExport = new Button { Text = "导出CSV", Location = new Point(760, 10), Size = new Size(90, 30), BackColor = ThemeColors.AccentGreen, ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
         btnExport.Click += (s, e) => ExportQuery();
-        var btnDelete = new Button { Text = "删除", Location = new Point(860, 10), Size = new Size(60, 30), BackColor = Color.FromArgb(200, 60, 60), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+        var btnDelete = new Button { Text = "删除", Location = new Point(860, 10), Size = new Size(60, 30), BackColor = ThemeColors.AccentRed, ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
         btnDelete.Click += (s, e) => DeleteRecord();
 
         topPanel.Controls.Add(dtpStart);
@@ -353,9 +354,9 @@ public partial class MainForm : Form
         dgvRecords = new DataGridView
         {
             Dock = DockStyle.Fill,
-            BackgroundColor = Color.FromArgb(30, 30, 30),
-            ForeColor = Color.White,
-            GridColor = Color.FromArgb(60, 60, 60),
+            BackgroundColor = ThemeColors.BgDark,
+            ForeColor = ThemeColors.TextPrimary,
+            GridColor = ThemeColors.GridBorder,
             AllowUserToAddRows = false,
             ReadOnly = true,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
@@ -363,39 +364,39 @@ public partial class MainForm : Form
             EnableHeadersVisualStyles = false,
             ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
             {
-                BackColor = Color.FromArgb(50, 50, 50),
-                ForeColor = Color.FromArgb(200, 200, 200),
+                BackColor = ThemeColors.GridHeader,
+                ForeColor = ThemeColors.TextSecondary,
                 Font = new Font("Microsoft YaHei", 9, FontStyle.Bold)
             },
             RowHeadersDefaultCellStyle = new DataGridViewCellStyle
             {
-                BackColor = Color.FromArgb(40, 40, 40),
-                ForeColor = Color.Gray
+                BackColor = ThemeColors.BgLight,
+                ForeColor = ThemeColors.TextSecondary
             },
             DefaultCellStyle = new DataGridViewCellStyle
             {
-                BackColor = Color.FromArgb(35, 35, 35),
-                ForeColor = Color.FromArgb(220, 220, 220),
-                SelectionBackColor = Color.FromArgb(0, 100, 180),
+                BackColor = ThemeColors.GridBg,
+                ForeColor = ThemeColors.GridText,
+                SelectionBackColor = ThemeColors.GridSelBg,
                 SelectionForeColor = Color.White
             },
             AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle
             {
-                BackColor = Color.FromArgb(42, 42, 42),
-                ForeColor = Color.FromArgb(220, 220, 220),
-                SelectionBackColor = Color.FromArgb(0, 100, 180),
+                BackColor = ThemeColors.GridAltBg,
+                ForeColor = ThemeColors.GridText,
+                SelectionBackColor = ThemeColors.GridSelBg,
                 SelectionForeColor = Color.White
             }
         };
         // 详情面板（右侧常显示）
-        var detailPanel = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(35, 35, 35), Padding = new Padding(10) };
+        var detailPanel = new Panel { Dock = DockStyle.Fill, BackColor = ThemeColors.GridBg, Padding = new Padding(10) };
         var txtDetail = new TextBox
         {
             Dock = DockStyle.Fill,
             Multiline = true,
             ReadOnly = true,
-            BackColor = Color.FromArgb(35, 35, 35),
-            ForeColor = Color.FromArgb(200, 200, 200),
+            BackColor = ThemeColors.GridBg,
+            ForeColor = ThemeColors.TextSecondary,
             Font = new Font("Microsoft YaHei", 10),
             BorderStyle = BorderStyle.None,
             Text = "← 选中一条记录查看详情"
@@ -514,12 +515,12 @@ public partial class MainForm : Form
 
     private void BuildCalibrationTab()
     {
-        var topPanel = new Panel { Dock = DockStyle.Top, Height = 70, BackColor = Color.FromArgb(40, 40, 40) };
+        var topPanel = new Panel { Dock = DockStyle.Top, Height = 70, BackColor = ThemeColors.BgLight };
 
-        lblCalTemp = new Label { Text = "当前校准温: 0.0 °C", ForeColor = Color.FromArgb(200, 180, 100), Font = new Font("Consolas", 20, FontStyle.Bold), Location = new Point(10, 15), Size = new Size(300, 40), TextAlign = ContentAlignment.MiddleCenter };
-        topPanel.Controls.Add(new Label { Text = "标准温度(°C):", ForeColor = Color.White, Location = new Point(320, 20), Size = new Size(100, 24) });
+        lblCalTemp = new Label { Text = "当前校准温: 0.0 °C", ForeColor = ThemeColors.CalGold, Font = new Font("Consolas", 20, FontStyle.Bold), Location = new Point(10, 15), Size = new Size(300, 40), TextAlign = ContentAlignment.MiddleCenter };
+        topPanel.Controls.Add(new Label { Text = "标准温度(°C):", ForeColor = ThemeColors.TextPrimary, Location = new Point(320, 20), Size = new Size(100, 24) });
         txtCalRefTemp = new TextBox { Location = new Point(420, 18), Size = new Size(80, 24), Text = "750" };
-        var btnCal = new Button { Text = "记录校准", Location = new Point(520, 15), Size = new Size(100, 32), BackColor = Color.FromArgb(60, 120, 200), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+        var btnCal = new Button { Text = "记录校准", Location = new Point(520, 15), Size = new Size(100, 32), BackColor = ThemeColors.AccentBlue, ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
         btnCal.Click += (s, e) =>
         {
             if (double.TryParse(txtCalRefTemp.Text, out double refTemp))
@@ -538,17 +539,17 @@ public partial class MainForm : Form
         dgvCalRecords = new DataGridView
         {
             Dock = DockStyle.Fill,
-            BackgroundColor = Color.FromArgb(30, 30, 30),
-            ForeColor = Color.White,
-            GridColor = Color.FromArgb(60, 60, 60),
+            BackgroundColor = ThemeColors.BgDark,
+            ForeColor = ThemeColors.TextPrimary,
+            GridColor = ThemeColors.GridBorder,
             AllowUserToAddRows = false,
             ReadOnly = true,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
             EnableHeadersVisualStyles = false,
-            ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(50, 50, 50), ForeColor = Color.FromArgb(200, 200, 200), Font = new Font("Microsoft YaHei", 9, FontStyle.Bold) },
-            RowHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(40, 40, 40), ForeColor = Color.Gray },
-            DefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(35, 35, 35), ForeColor = Color.FromArgb(220, 220, 220), SelectionBackColor = Color.FromArgb(0, 100, 180), SelectionForeColor = Color.White },
-            AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(42, 42, 42), ForeColor = Color.FromArgb(220, 220, 220), SelectionBackColor = Color.FromArgb(0, 100, 180), SelectionForeColor = Color.White }
+            ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = ThemeColors.GridHeader, ForeColor = ThemeColors.TextSecondary, Font = new Font("Microsoft YaHei", 9, FontStyle.Bold) },
+            RowHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = ThemeColors.BgLight, ForeColor = ThemeColors.TextSecondary },
+            DefaultCellStyle = new DataGridViewCellStyle { BackColor = ThemeColors.GridBg, ForeColor = ThemeColors.GridText, SelectionBackColor = ThemeColors.GridSelBg, SelectionForeColor = Color.White },
+            AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle { BackColor = ThemeColors.GridAltBg, ForeColor = ThemeColors.GridText, SelectionBackColor = ThemeColors.GridSelBg, SelectionForeColor = Color.White }
         };
         tabCalibration.Controls.Add(dgvCalRecords);
         tabCalibration.Controls.Add(topPanel);
