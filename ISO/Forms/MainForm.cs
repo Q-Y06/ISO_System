@@ -20,6 +20,9 @@ public partial class MainForm : Form
     private Label lblTF1Val = null!, lblTF2Val = null!, lblTSVal = null!, lblTCVal = null!, lblTCalVal = null!;
     private Label lblStatus = null!, lblTimer = null!, lblDrift = null!, lblSample = null!;
 
+    // 防频闪：缓存上次显示的温度值，只在值变化时才更新 Label
+    private double _lastTF1 = double.MinValue, _lastTF2 = double.MinValue, _lastTS = double.MinValue, _lastTC = double.MinValue, _lastTCal = double.MinValue;
+
     // Buttons
     private Button btnNewTest = null!, btnStartHeat = null!, btnStopHeat = null!;
     private Button btnStartRecord = null!, btnStopRecord = null!, btnTestRecord = null!, btnSettings = null!;
@@ -46,6 +49,11 @@ public partial class MainForm : Form
     private DateTimePicker dtpStart = null!, dtpEnd = null!;
     private TextBox txtQueryProduct = null!;
     private ComboBox cmbQueryOperator = null!;
+    // 详情卡片
+    private Panel detailCardPanel = null!;
+    private Label lblDetailTitle = null!, lblDetailVerdict = null!, lblDetailBody = null!;
+    // 表格底部统计
+    private Label lblRecordCount = null!;
 
     // Calibration tab
     private Label lblCalTemp = null!;
@@ -54,6 +62,15 @@ public partial class MainForm : Form
 
     public MainForm()
     {
+        // 防频闪：开启 Form 级双缓冲
+        this.DoubleBuffered = true;
+        SetStyle(
+            ControlStyles.AllPaintingInWmPaint |
+            ControlStyles.UserPaint |
+            ControlStyles.OptimizedDoubleBuffer |
+            ControlStyles.ResizeRedraw,
+            true);
+
         _tc = _ctx.TestController;
         InitializeComponent();
         SetupPlot();
@@ -188,6 +205,21 @@ public partial class MainForm : Form
         this.Controls.Add(tabControl);
     }
 
+    /// <summary>为控件递归开启双缓冲，消除频闪</summary>
+    private static void EnableDoubleBuffering(Control control)
+    {
+        // Panel 等控件的 DoubleBuffered 是 protected 属性，通过反射设置
+        var prop = typeof(Control).GetProperty("DoubleBuffered",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        void SetDbl(Control c)
+        {
+            prop?.SetValue(c, true, null);
+            foreach (Control child in c.Controls)
+                SetDbl(child);
+        }
+        SetDbl(control);
+    }
+
     /// <summary>温度面板 — 5 通道自适应排列</summary>
     private Panel CreateTemperaturePanel()
     {
@@ -255,6 +287,10 @@ public partial class MainForm : Form
 
         panel.Controls.Add(ledTable);
         lblTF1Val = lbls[0]; lblTF2Val = lbls[1]; lblTSVal = lbls[2]; lblTCVal = lbls[3]; lblTCalVal = lbls[4];
+
+        // 温度面板所有子控件开启双缓冲，消除数字频闪
+        EnableDoubleBuffering(panel);
+
         return panel;
     }
 
@@ -557,137 +593,354 @@ public partial class MainForm : Form
 
     private void BuildQueryTab()
     {
-        var topPanel = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = ThemeColors.BgLight };
+        // === 顶部筛选栏（标题 + 条件行） ===
+        var topPanel = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 78,
+            BackColor = ThemeColors.BgMedium,
+            Padding = new Padding(14, 8, 14, 8)
+        };
 
-        topPanel.Controls.Add(new Label { Text = "开始:", ForeColor = ThemeColors.TextPrimary, Location = new Point(10, 15), Size = new Size(40, 22) });
-        dtpStart = new DateTimePicker { Location = new Point(50, 12), Size = new Size(120, 24), Format = DateTimePickerFormat.Short, Value = DateTime.Now.AddDays(-30) };
-        topPanel.Controls.Add(new Label { Text = "结束:", ForeColor = ThemeColors.TextPrimary, Location = new Point(180, 15), Size = new Size(40, 22) });
-        dtpEnd = new DateTimePicker { Location = new Point(220, 12), Size = new Size(120, 24), Format = DateTimePickerFormat.Short, Value = DateTime.Now };
-        topPanel.Controls.Add(new Label { Text = "样品:", ForeColor = ThemeColors.TextPrimary, Location = new Point(350, 15), Size = new Size(40, 22) });
-        txtQueryProduct = new TextBox { Location = new Point(390, 12), Size = new Size(100, 24) };
-        topPanel.Controls.Add(new Label { Text = "操作员:", ForeColor = ThemeColors.TextPrimary, Location = new Point(500, 15), Size = new Size(55, 22) });
-        cmbQueryOperator = new ComboBox { Location = new Point(555, 12), Size = new Size(100, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+        var topLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2
+        };
+        topLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
+        topLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
-        var btnQuery = MkSmallBtn("查询", ThemeColors.AccentBlue, new Point(670, 10), new Size(75, 30));
+        // 标题
+        var titleBar = new Panel { Dock = DockStyle.Fill };
+        titleBar.Controls.Add(new Label
+        {
+            Text = "▌ 记录查询",
+            ForeColor = ThemeColors.TextPrimary,
+            Font = new Font("Microsoft YaHei", 11, FontStyle.Bold),
+            Location = new Point(0, 0),
+            Size = new Size(200, 24)
+        });
+        topLayout.Controls.Add(titleBar, 0, 0);
+
+        // 筛选条件 + 按钮
+        var filterRow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            WrapContents = false,
+            Margin = new Padding(0)
+        };
+
+        Control MkFilterLabel(string label, Control input, int w)
+        {
+            var p = new Panel { Size = new Size(62 + w, 38), Margin = new Padding(0, 0, 10, 0) };
+            p.Controls.Add(new Label { Text = label, ForeColor = ThemeColors.TextMuted, Font = new Font("Microsoft YaHei", 8), Location = new Point(0, 0), Size = new Size(54, 14) });
+            input.Location = new Point(0, 15);
+            input.Size = new Size(w, 26);
+            p.Controls.Add(input);
+            return p;
+        }
+
+        dtpStart = new DateTimePicker { Format = DateTimePickerFormat.Short, Value = DateTime.Now.AddDays(-30), Font = new Font("Microsoft YaHei", 9) };
+        dtpEnd = new DateTimePicker { Format = DateTimePickerFormat.Short, Value = DateTime.Now, Font = new Font("Microsoft YaHei", 9) };
+        filterRow.Controls.Add(MkFilterLabel("开始日期", dtpStart, 110));
+        filterRow.Controls.Add(MkFilterLabel("结束日期", dtpEnd, 110));
+        txtQueryProduct = new TextBox { Font = new Font("Microsoft YaHei", 9), BorderStyle = BorderStyle.FixedSingle };
+        filterRow.Controls.Add(MkFilterLabel("样品编号", txtQueryProduct, 100));
+        cmbQueryOperator = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Microsoft YaHei", 9), FlatStyle = FlatStyle.Flat };
+        filterRow.Controls.Add(MkFilterLabel("操作员", cmbQueryOperator, 100));
+
+        // 按钮组
+        var btnBar = new Panel { Size = new Size(284, 38), Margin = new Padding(8, 0, 0, 0) };
+        Button MkBtn(string t, Color c, int x, int w)
+        {
+            var b = new Button { Text = t, Location = new Point(x, 3), Size = new Size(w, 28), BackColor = c, ForeColor = Color.White, Font = new Font("Microsoft YaHei", 9, FontStyle.Bold), FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand, TextAlign = ContentAlignment.MiddleCenter };
+            b.FlatAppearance.BorderSize = 0;
+            return b;
+        }
+        var btnQuery = MkBtn("🔍 查询", ThemeColors.AccentBlue, 0, 72);
+        var btnExport = MkBtn("📥 导出", ThemeColors.AccentGreen, 80, 78);
+        var btnDelete = MkBtn("🗑 删除", ThemeColors.AccentRed, 166, 62);
         btnQuery.Click += (s, e) => RunQuery();
-        var btnExport = MkSmallBtn("导出Excel", ThemeColors.AccentGreen, new Point(755, 10), new Size(90, 30));
         btnExport.Click += (s, e) => ExportQuery();
-        var btnDelete = MkSmallBtn("删除", ThemeColors.AccentRed, new Point(855, 10), new Size(60, 30));
         btnDelete.Click += (s, e) => DeleteRecord();
+        btnBar.Controls.Add(btnQuery);
+        btnBar.Controls.Add(btnExport);
+        btnBar.Controls.Add(btnDelete);
+        filterRow.Controls.Add(btnBar);
 
-        topPanel.Controls.Add(dtpStart);
-        topPanel.Controls.Add(dtpEnd);
-        topPanel.Controls.Add(txtQueryProduct);
-        topPanel.Controls.Add(cmbQueryOperator);
-        topPanel.Controls.Add(btnQuery);
-        topPanel.Controls.Add(btnExport);
-        topPanel.Controls.Add(btnDelete);
+        topLayout.Controls.Add(filterRow, 0, 1);
+        topPanel.Controls.Add(topLayout);
 
+        // === 表格 ===
         dgvRecords = new DataGridView
         {
             Dock = DockStyle.Fill,
             BackgroundColor = ThemeColors.BgDark,
-            ForeColor = ThemeColors.TextPrimary,
-            GridColor = ThemeColors.GridBorder,
+            GridColor = Color.FromArgb(228, 230, 235),
             AllowUserToAddRows = false,
             ReadOnly = true,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
             EnableHeadersVisualStyles = false,
+            BorderStyle = BorderStyle.None,
+            RowTemplate = { Height = 34 },
+            ColumnHeadersHeight = 40,
+            ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
+            RowHeadersWidth = 54,
+            RowHeadersWidthSizeMode = DataGridViewRowHeadersWidthSizeMode.DisableResizing,
             ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
             {
-                BackColor = ThemeColors.GridHeader,
-                ForeColor = ThemeColors.TextSecondary,
-                Font = new Font("Microsoft YaHei", 9, FontStyle.Bold)
+                BackColor = Color.FromArgb(240, 242, 248),
+                ForeColor = Color.FromArgb(55, 55, 68),
+                Font = new Font("Microsoft YaHei", 9, FontStyle.Bold),
+                Alignment = DataGridViewContentAlignment.MiddleCenter,
+                Padding = new Padding(0, 0, 0, 0)
             },
             RowHeadersDefaultCellStyle = new DataGridViewCellStyle
             {
-                BackColor = ThemeColors.BgLight,
-                ForeColor = ThemeColors.TextSecondary
+                BackColor = Color.FromArgb(248, 249, 252),
+                ForeColor = Color.FromArgb(140, 142, 150),
+                Font = new Font("Consolas", 8),
+                Alignment = DataGridViewContentAlignment.MiddleCenter
             },
             DefaultCellStyle = new DataGridViewCellStyle
             {
-                BackColor = ThemeColors.GridBg,
-                ForeColor = ThemeColors.GridText,
-                SelectionBackColor = ThemeColors.GridSelBg,
-                SelectionForeColor = Color.White
+                BackColor = Color.White,
+                ForeColor = Color.FromArgb(35, 35, 48),
+                SelectionBackColor = Color.FromArgb(0, 120, 215),
+                SelectionForeColor = Color.White,
+                Font = new Font("Microsoft YaHei", 9),
+                Padding = new Padding(10, 0, 10, 0)
             },
             AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle
             {
-                BackColor = ThemeColors.GridAltBg,
-                ForeColor = ThemeColors.GridText,
-                SelectionBackColor = ThemeColors.GridSelBg,
-                SelectionForeColor = Color.White
+                BackColor = Color.FromArgb(246, 247, 252),
+                ForeColor = Color.FromArgb(35, 35, 48),
+                SelectionBackColor = Color.FromArgb(0, 120, 215),
+                SelectionForeColor = Color.White,
+                Font = new Font("Microsoft YaHei", 9),
+                Padding = new Padding(10, 0, 10, 0)
             }
         };
 
-        var detailPanel = new Panel { Dock = DockStyle.Fill, BackColor = ThemeColors.GridBg, Padding = new Padding(10) };
-        var txtDetail = new TextBox
+        // === 行号绘制 ===
+        dgvRecords.RowPostPaint += (s, e) =>
+        {
+            if (e.RowIndex < 0) return;
+            var grid = (DataGridView)s!;
+            var rect = new Rectangle(e.RowBounds.Left, e.RowBounds.Top,
+                grid.RowHeadersWidth - 2, e.RowBounds.Height);
+            var num = (e.RowIndex + 1).ToString();
+            using var brush = new SolidBrush(Color.FromArgb(150, 152, 162));
+            using var font = new Font("Consolas", 8.5f);
+            var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+            e.Graphics.DrawString(num, font, brush, rect, sf);
+            // 行号底部微细分隔线
+            using var pen = new Pen(Color.FromArgb(228, 230, 235), 0.5f);
+            e.Graphics.DrawLine(pen, e.RowBounds.Left, e.RowBounds.Bottom - 1,
+                e.RowBounds.Left + grid.RowHeadersWidth, e.RowBounds.Bottom - 1);
+        };
+        // 隐藏默认行头文字
+        dgvRecords.RowHeadersDefaultCellStyle.Padding = new Padding(0);
+
+        // === 单元格格式化：数字右对齐、日期居中 ===
+        dgvRecords.CellFormatting += (s, e) =>
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0 || e.Value == null) return;
+            var col = dgvRecords.Columns[e.ColumnIndex];
+            var name = col.HeaderText;
+            // 数字列右对齐
+            if (name is "试验前质量" or "试验后质量" or "失重率" or "温升" or "时长")
+            {
+                e.CellStyle!.Alignment = DataGridViewContentAlignment.MiddleRight;
+                e.CellStyle.Padding = new Padding(0, 0, 14, 0);
+            }
+            // 日期列居中
+            else if (name is "试验日期")
+            {
+                e.CellStyle!.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            }
+            // 文本列左对齐
+            else
+            {
+                e.CellStyle!.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            }
+        };
+
+        // === 悬停高亮 ===
+        dgvRecords.CellMouseEnter += (s, e) =>
+        {
+            if (e.RowIndex >= 0)
+                dgvRecords.Rows[e.RowIndex].DefaultCellStyle!.BackColor = Color.FromArgb(235, 240, 252);
+        };
+        dgvRecords.CellMouseLeave += (s, e) =>
+        {
+            if (e.RowIndex >= 0 && !dgvRecords.Rows[e.RowIndex].Selected)
+            {
+                bool alt = e.RowIndex % 2 == 1;
+                dgvRecords.Rows[e.RowIndex].DefaultCellStyle!.BackColor =
+                    alt ? Color.FromArgb(246, 247, 252) : Color.White;
+            }
+        };
+
+        // === 底部统计栏 ===
+        var statusBar = new Panel
+        {
+            Dock = DockStyle.Bottom,
+            Height = 28,
+            BackColor = Color.FromArgb(240, 242, 248),
+            Padding = new Padding(12, 0, 12, 0)
+        };
+        lblRecordCount = new Label
+        {
+            Text = "共 0 条记录",
+            ForeColor = Color.FromArgb(130, 132, 142),
+            Font = new Font("Microsoft YaHei", 9),
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        statusBar.Controls.Add(lblRecordCount);
+
+        // 表格 + 统计栏包装
+        var tablePanel = new Panel { Dock = DockStyle.Fill };
+        tablePanel.Controls.Add(dgvRecords);
+        tablePanel.Controls.Add(statusBar);
+
+        // === 详情卡片面板 ===
+        detailCardPanel = new Panel
         {
             Dock = DockStyle.Fill,
-            Multiline = true,
-            ReadOnly = true,
-            BackColor = ThemeColors.GridBg,
-            ForeColor = ThemeColors.TextSecondary,
-            Font = new Font("Microsoft YaHei", 10),
-            BorderStyle = BorderStyle.None,
-            Text = "← 选中一条记录查看详情"
+            BackColor = ThemeColors.BgMedium,
+            Padding = new Padding(16, 14, 16, 14),
+            AutoScroll = true
         };
-        detailPanel.Controls.Add(txtDetail);
 
-        dgvRecords.SelectionChanged += (s, e) =>
+        var card = new Panel
         {
-            if (dgvRecords.CurrentRow?.DataBoundItem == null) return;
-            dynamic row = dgvRecords.CurrentRow.DataBoundItem;
-            var tm = _ctx.Db.GetTestMaster((string)row.ProductId, (string)row.TestId);
-            if (tm != null)
-            {
-                string verdict = (tm.DeltaTf <= 50 && tm.LostWeightPer <= 50 && tm.FlameDuration < 5)
-                    ? "通过 — 材料判定为不燃" : "不通过";
-                txtDetail.Text =
-                    $"样品编号: {tm.ProductId}\r\n" +
-                    $"试验标识: {tm.TestId}\r\n" +
-                    $"试验日期: {tm.TestDate}\r\n" +
-                    $"操作员: {tm.Operator}\r\n" +
-                    $"━━━━━━━━━━━━━━━━\r\n" +
-                    $"环境温度: {tm.EnvTemp:F1} °C\r\n" +
-                    $"环境湿度: {tm.EnvHumidity:F1} %\r\n" +
-                    $"━━━━━━━━━━━━━━━━\r\n" +
-                    $"试验前质量: {tm.PreWeight:F2} g\r\n" +
-                    $"试验后质量: {tm.PostWeight:F2} g\r\n" +
-                    $"失重量: {tm.LostWeight:F2} g\r\n" +
-                    $"失重率: {tm.LostWeightPer:F2} %\r\n" +
-                    $"━━━━━━━━━━━━━━━━\r\n" +
-                    $"炉温1 温升: {tm.DeltaTf1:F1} °C\r\n" +
-                    $"炉温2 温升: {tm.DeltaTf2:F1} °C\r\n" +
-                    $"表面温升: {tm.DeltaTs:F1} °C\r\n" +
-                    $"中心温升: {tm.DeltaTc:F1} °C\r\n" +
-                    $"综合温升: {tm.DeltaTf:F1} °C\r\n" +
-                    $"━━━━━━━━━━━━━━━━\r\n" +
-                    $"火焰持续: {tm.FlameDuration} 秒\r\n" +
-                    $"试验时长: {tm.TotalTestTime} 秒\r\n" +
-                    $"备注: {tm.Remark}\r\n" +
-                    $"━━━━━━━━━━━━━━━━\r\n" +
-                    $"判定结论: {verdict}";
-            }
+            Dock = DockStyle.Top,
+            Height = 430,
+            BackColor = Color.White,
+            Padding = new Padding(18, 14, 18, 14)
+        };
+        // 卡片边框
+        card.Paint += (s, e) =>
+        {
+            var r = card.ClientRectangle; r.Width--; r.Height--;
+            using var pen = new Pen(Color.FromArgb(215, 217, 224), 1);
+            e.Graphics.DrawRectangle(pen, r);
         };
 
+        lblDetailTitle = new Label
+        {
+            Text = "选中一条记录查看详情",
+            ForeColor = ThemeColors.TextMuted,
+            Font = new Font("Microsoft YaHei", 11, FontStyle.Bold),
+            Location = new Point(18, 14),
+            Size = new Size(340, 28),
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+
+        lblDetailVerdict = new Label
+        {
+            Text = "",
+            ForeColor = Color.White,
+            Font = new Font("Microsoft YaHei", 13, FontStyle.Bold),
+            Location = new Point(18, 48),
+            Size = new Size(340, 34),
+            TextAlign = ContentAlignment.MiddleCenter,
+            Visible = false
+        };
+
+        lblDetailBody = new Label
+        {
+            Text = "",
+            ForeColor = Color.FromArgb(60, 60, 70),
+            Font = new Font("Microsoft YaHei", 10),
+            Location = new Point(18, 92),
+            Size = new Size(340, 320),
+            TextAlign = ContentAlignment.TopLeft
+        };
+
+        card.Controls.Add(lblDetailTitle);
+        card.Controls.Add(lblDetailVerdict);
+        card.Controls.Add(lblDetailBody);
+        detailCardPanel.Controls.Add(card);
+
+        dgvRecords.SelectionChanged += (s, e) => FillDetailCard();
+
+        // === 拼装 ===
         var splitQuery = new SplitContainer
         {
             Dock = DockStyle.Fill,
             Orientation = Orientation.Vertical,
-            SplitterDistance = 550
+            SplitterDistance = 560,
+            SplitterWidth = 4,
+            BackColor = Color.FromArgb(210, 212, 218)
         };
-        splitQuery.Panel1.Controls.Add(dgvRecords);
-        splitQuery.Panel2.Controls.Add(detailPanel);
+        splitQuery.Panel1.Controls.Add(tablePanel);
+        splitQuery.Panel2.Controls.Add(detailCardPanel);
 
         tabQuery.Controls.Add(splitQuery);
         tabQuery.Controls.Add(topPanel);
 
+        // 填充操作员
         var ops = _ctx.Db.GetAllOperators();
         cmbQueryOperator.Items.Add("全部");
         foreach (var op in ops) cmbQueryOperator.Items.Add(op.Username);
         cmbQueryOperator.SelectedIndex = 0;
+    }
+
+    private void FillDetailCard()
+    {
+        if (dgvRecords.CurrentRow?.DataBoundItem == null)
+        {
+            lblDetailTitle.Text = "选中一条记录查看详情";
+            lblDetailTitle.ForeColor = ThemeColors.TextMuted;
+            lblDetailVerdict.Visible = false;
+            lblDetailBody.Text = "";
+            return;
+        }
+        dynamic row = dgvRecords.CurrentRow.DataBoundItem;
+        var tm = _ctx.Db.GetTestMaster((string)row.样品编号, (string)row.试验标识);
+        if (tm == null) return;
+
+        bool pass = tm.DeltaTf <= 50 && tm.LostWeightPer <= 50 && tm.FlameDuration < 5;
+        string verdict = pass ? "✓ 通过 — 材料判定为不燃" : "✗ 不通过";
+
+        lblDetailTitle.Text = $"样品: {tm.ProductId}  |  试验: {tm.TestId}";
+        lblDetailTitle.ForeColor = ThemeColors.TextPrimary;
+
+        lblDetailVerdict.Text = verdict;
+        lblDetailVerdict.BackColor = pass ? Color.FromArgb(46, 160, 67) : Color.FromArgb(220, 60, 50);
+        lblDetailVerdict.Visible = true;
+
+        lblDetailBody.Text =
+            $"📋 基本信息\r\n" +
+            $"   试验日期     {tm.TestDate}\r\n" +
+            $"   操作员        {tm.Operator}\r\n" +
+            $"\r\n" +
+            $"🌡 环境参数\r\n" +
+            $"   环境温度     {tm.EnvTemp:F1} °C\r\n" +
+            $"   环境湿度     {tm.EnvHumidity:F1} %\r\n" +
+            $"\r\n" +
+            $"⚖ 质量数据\r\n" +
+            $"   试验前质量  {tm.PreWeight:F2} g\r\n" +
+            $"   试验后质量  {tm.PostWeight:F2} g\r\n" +
+            $"   失重量        {tm.LostWeight:F2} g\r\n" +
+            $"   失重率        {tm.LostWeightPer:F2} %\r\n" +
+            $"\r\n" +
+            $"🔥 温升数据\r\n" +
+            $"   炉温1          {tm.DeltaTf1:F1} °C\r\n" +
+            $"   炉温2          {tm.DeltaTf2:F1} °C\r\n" +
+            $"   表面温度      {tm.DeltaTs:F1} °C\r\n" +
+            $"   中心温度      {tm.DeltaTc:F1} °C\r\n" +
+            $"   综合温升      {tm.DeltaTf:F1} °C\r\n" +
+            $"\r\n" +
+            $"⏱ 试验信息\r\n" +
+            $"   火焰持续      {tm.FlameDuration} 秒\r\n" +
+            $"   试验时长      {tm.TotalTestTime} 秒\r\n" +
+            $"   备注           {(string.IsNullOrEmpty(tm.Remark) ? "—" : tm.Remark)}";
     }
 
     private static Button MkSmallBtn(string text, Color backColor, Point loc, Size size)
@@ -717,13 +970,19 @@ public partial class MainForm : Form
         string? sd = dtpStart.Value.ToString("yyyy-MM-dd");
         string? ed = dtpEnd.Value.AddDays(1).ToString("yyyy-MM-dd");
         var records = _ctx.Db.QueryTestMasters(pid, op, sd, ed);
-        dgvRecords.DataSource = records.Select(r => new {
-            r.ProductId, r.TestId, r.TestDate, r.Operator,
-            r.PreWeight, r.PostWeight,
+        var list = records.Select(r => new {
+            样品编号 = r.ProductId,
+            试验标识 = r.TestId,
+            试验日期 = r.TestDate,
+            操作员 = r.Operator,
+            试验前质量 = $"{r.PreWeight:F2} g",
+            试验后质量 = $"{r.PostWeight:F2} g",
             失重率 = $"{r.LostWeightPer:F2}%",
-            温升 = $"{r.DeltaTf:F1}°C",
-            时长 = $"{r.TotalTestTime}s"
+            综合温升 = $"{r.DeltaTf:F1}°C",
+            试验时长 = $"{r.TotalTestTime}s"
         }).ToList();
+        dgvRecords.DataSource = list;
+        lblRecordCount.Text = $"共 {list.Count} 条记录";
     }
 
     private void ExportQuery()
@@ -825,13 +1084,26 @@ public partial class MainForm : Form
     {
         var temps = e.Temperatures;
 
-        // 即时刷新温度显示
-        lblTF1Val.Text = $"{temps["TF1"]:F1} °C";
-        lblTF2Val.Text = $"{temps["TF2"]:F1} °C";
-        lblTSVal.Text = $"{temps["TS"]:F1} °C";
-        lblTCVal.Text = $"{temps["TC"]:F1} °C";
-        lblTCalVal.Text = $"{temps["TCal"]:F1} °C";
-        lblCalTemp.Text = $"当前校准温: {temps["TCal"]:F1} °C";
+        // === 防频闪：只在温度值实际变化时才更新 Label ===
+        // 获取当前温度值
+        double tf1 = temps["TF1"], tf2 = temps["TF2"], ts = temps["TS"], tc = temps["TC"], tcal = temps["TCal"];
+
+        // 计算精度阈值（变化 < 0.05°C 时肉眼不可见，跳过更新）
+        const double eps = 0.049;
+
+        bool anyTempChanged = false;
+        if (Math.Abs(tf1 - _lastTF1) > eps) { _lastTF1 = tf1; lblTF1Val.Text = $"{tf1:F1} °C"; anyTempChanged = true; }
+        if (Math.Abs(tf2 - _lastTF2) > eps) { _lastTF2 = tf2; lblTF2Val.Text = $"{tf2:F1} °C"; anyTempChanged = true; }
+        if (Math.Abs(ts - _lastTS) > eps)   { _lastTS = ts;   lblTSVal.Text = $"{ts:F1} °C";   anyTempChanged = true; }
+        if (Math.Abs(tc - _lastTC) > eps)   { _lastTC = tc;   lblTCVal.Text = $"{tc:F1} °C";   anyTempChanged = true; }
+        if (Math.Abs(tcal - _lastTCal) > eps) { _lastTCal = tcal; lblTCalVal.Text = $"{tcal:F1} °C"; lblCalTemp.Text = $"当前校准温: {tcal:F1} °C"; anyTempChanged = true; }
+
+        // SuspendLayout 防止中间态闪烁
+        if (anyTempChanged)
+        {
+            this.SuspendLayout();
+            this.ResumeLayout(false);
+        }
 
         int runSec = _ctx.DaqWorker.TotalRunSeconds;
         string timerText;
@@ -868,6 +1140,9 @@ public partial class MainForm : Form
             while (s.Points.Count > 800) s.Points.RemoveAt(0);
 
         _tickCounter++;
+
+        // 防频闪：全刷新（重算Y轴范围）仅每 60 次 tick（约 48 秒）触发
+        // 轻刷新（只更新曲线数据）每 tick 执行，保证曲线跟随数字同步变化
         bool fullRefresh = axisChanged || (_tickCounter % 60 == 0);
 
         // Y轴自动缩放：根据实际数据范围动态调整，避免曲线被压平
@@ -897,6 +1172,7 @@ public partial class MainForm : Form
             }
         }
 
+        // 每 tick 都刷新曲线数据（轻刷新），保证与数字同步；双缓冲已消除频闪
         plotModel.InvalidatePlot(fullRefresh);
 
         // 日志消息
