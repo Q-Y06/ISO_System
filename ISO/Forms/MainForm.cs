@@ -978,8 +978,7 @@ public partial class MainForm : Form
         if (_tc.CurrentTest != null) lblSample.Text = $"样品: {_tc.CurrentTest.ProductId}";
 
         // 更新曲线数据
-        // 统一使用 Points.Count+1 作为 X 轴，避免 Recording 后 ElapsedSeconds 归零导致曲线重叠
-        double t = seriesTF1.Points.Count + 1;
+        double t = _tc.State == TestState.Recording ? e.ElapsedSeconds : seriesTF1.Points.Count + 1;
         seriesTF1.Points.Add(new DataPoint(t, temps["TF1"]));
         seriesTF2.Points.Add(new DataPoint(t, temps["TF2"]));
         seriesTS.Points.Add(new DataPoint(t, temps["TS"]));
@@ -1041,7 +1040,7 @@ public partial class MainForm : Form
         bool hasUnSaved = _tc.HasUnSavedCompleteTest();
         bool hasActive = _tc.CurrentTest != null;
 
-        btnNewTest.Enabled = s == TestState.Idle || s == TestState.Preparing || (s == TestState.Complete && !hasUnSaved);
+        btnNewTest.Enabled = s == TestState.Idle || (s == TestState.Preparing && !hasActive) || (s == TestState.Complete && !hasUnSaved);
         btnStartHeat.Enabled = s == TestState.Idle;
         btnStopHeat.Enabled = s == TestState.Preparing || s == TestState.Ready || s == TestState.Complete;
         btnStartRecord.Enabled = s == TestState.Ready && !hasUnSaved && _tc.CurrentTest != null;
@@ -1057,7 +1056,6 @@ public partial class MainForm : Form
         {
             _tc.CreateTest(dlg.TestMaster!, dlg.ProductMaster!);
             ClearChart();
-            ShowInitialTemperatures();  // 新建试验时刷新当前炉温显示
             if (_tc.State == TestState.Idle)
             {
                 _tc.StartHeating();
