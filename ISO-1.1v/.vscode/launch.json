@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "ISO 11820 不燃性试验系统",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/bin/Debug/net8.0-windows/ISO11820.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            "console": "internalConsole",
+            "env": {
+                "DOTNET_ENVIRONMENT": "Development"
+            }
+        }
+    ]
+}
