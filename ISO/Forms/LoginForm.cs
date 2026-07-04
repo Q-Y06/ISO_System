@@ -1,4 +1,4 @@
-using Serilog;
+using ISO11820.Helpers;
 using AppContext = ISO11820.Global.AppContext;
 
 namespace ISO11820.Forms;
@@ -23,26 +23,26 @@ public partial class LoginForm : Form
         this.StartPosition = FormStartPosition.CenterScreen;
         this.FormBorderStyle = FormBorderStyle.FixedDialog;
         this.MaximizeBox = false;
-        this.BackColor = Color.FromArgb(245, 245, 245);
-        this.ForeColor = Color.FromArgb(30, 30, 30);
+        this.BackColor = ThemeColors.BgDark;
+        this.ForeColor = ThemeColors.TextPrimary;
 
         lblTitle = new Label
         {
             Text = "ISO 11820 建筑材料不燃性试验系统",
             Font = new Font("Microsoft YaHei", 14, FontStyle.Bold),
+            ForeColor = ThemeColors.TextPrimary,
             Size = new Size(380, 35),
             Location = new Point(20, 20),
-            TextAlign = ContentAlignment.MiddleCenter,
-            ForeColor = Color.FromArgb(30, 30, 30)
+            TextAlign = ContentAlignment.MiddleCenter
         };
 
         gbRole = new GroupBox
         {
             Text = "选择角色",
+            ForeColor = ThemeColors.TextPrimary,
             Font = new Font("Microsoft YaHei", 10),
             Size = new Size(360, 65),
-            Location = new Point(20, 65),
-            ForeColor = Color.FromArgb(30, 30, 30)
+            Location = new Point(20, 65)
         };
 
         rbAdmin = new RadioButton
@@ -51,8 +51,8 @@ public partial class LoginForm : Form
             Location = new Point(30, 28),
             Size = new Size(80, 22),
             Checked = true,
-            Font = new Font("Microsoft YaHei", 10),
-            ForeColor = Color.FromArgb(30, 30, 30)
+            ForeColor = ThemeColors.TextPrimary,
+            Font = new Font("Microsoft YaHei", 10)
         };
 
         rbExperimenter = new RadioButton
@@ -60,8 +60,8 @@ public partial class LoginForm : Form
             Text = "试验员",
             Location = new Point(130, 28),
             Size = new Size(80, 22),
-            Font = new Font("Microsoft YaHei", 10),
-            ForeColor = Color.FromArgb(30, 30, 30)
+            ForeColor = ThemeColors.TextPrimary,
+            Font = new Font("Microsoft YaHei", 10)
         };
 
         gbRole.Controls.Add(rbAdmin);
@@ -70,10 +70,10 @@ public partial class LoginForm : Form
         lblPassword = new Label
         {
             Text = "输入密码:",
+            ForeColor = ThemeColors.TextPrimary,
             Font = new Font("Microsoft YaHei", 10),
             Location = new Point(20, 145),
-            Size = new Size(80, 25),
-            ForeColor = Color.FromArgb(30, 30, 30)
+            Size = new Size(80, 25)
         };
 
         txtPassword = new TextBox
@@ -81,10 +81,10 @@ public partial class LoginForm : Form
             Location = new Point(110, 143),
             Size = new Size(200, 28),
             PasswordChar = '*',
-            Font = new Font("Microsoft YaHei", 10),
-            BackColor = Color.White,
-            ForeColor = Color.FromArgb(30, 30, 30),
-            BorderStyle = BorderStyle.FixedSingle
+            BackColor = ThemeColors.BgInput,
+            ForeColor = ThemeColors.TextPrimary,
+            BorderStyle = BorderStyle.FixedSingle,
+            Font = new Font("Microsoft YaHei", 10)
         };
 
         btnLogin = new Button
@@ -93,7 +93,7 @@ public partial class LoginForm : Form
             Location = new Point(80, 200),
             Size = new Size(100, 38),
             Font = new Font("Microsoft YaHei", 10, FontStyle.Bold),
-            BackColor = Color.FromArgb(0, 122, 204),
+            BackColor = ThemeColors.LoginBlue,
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat
         };
@@ -106,8 +106,8 @@ public partial class LoginForm : Form
             Location = new Point(220, 200),
             Size = new Size(100, 38),
             Font = new Font("Microsoft YaHei", 10),
-            BackColor = Color.FromArgb(220, 220, 220),
-            ForeColor = Color.FromArgb(60, 60, 60),
+            BackColor = ThemeColors.LoginGray,
+            ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat
         };
         btnCancel.FlatAppearance.BorderSize = 0;
@@ -132,7 +132,6 @@ public partial class LoginForm : Form
         var op = AppContext.Instance.Db.ValidateLogin(username, password);
         if (op != null)
         {
-            Log.Information("用户登录: {Username} 角色: {Role}", op.Username, op.Role);
             AppContext.Instance.CurrentOperator = op.Username;
             AppContext.Instance.CurrentRole = op.Role;
 
