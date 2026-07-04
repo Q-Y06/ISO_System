@@ -251,4 +251,59 @@ public class DbHelper
         cmd.Parameters.AddWithValue("@tid", testId);
         cmd.ExecuteNonQuery();
     }
+
+    /// <summary>批量插入温度数据（每条记录一秒）</summary>
+    public void InsertTemperatureData(string productId, string testId, List<TemperatureData> tempData)
+    {
+        using var conn = CreateConnection();
+        using var txn = conn.BeginTransaction();
+        using var cmd = new SqliteCommand(
+            @"INSERT INTO temperaturedata (productid, testid, time, temp1, temp2, tempsurface, tempcenter, tempcalibration)
+              VALUES (@pid, @tid, @t, @t1, @t2, @ts, @tc, @tcal)", conn, txn);
+        cmd.Parameters.AddWithValue("@pid", productId);
+        cmd.Parameters.AddWithValue("@tid", testId);
+        var tParam = cmd.Parameters.Add("@t", SqliteType.Integer);
+        var t1Param = cmd.Parameters.Add("@t1", SqliteType.Real);
+        var t2Param = cmd.Parameters.Add("@t2", SqliteType.Real);
+        var tsParam = cmd.Parameters.Add("@ts", SqliteType.Real);
+        var tcParam = cmd.Parameters.Add("@tc", SqliteType.Real);
+        var tcalParam = cmd.Parameters.Add("@tcal", SqliteType.Real);
+
+        foreach (var td in tempData)
+        {
+            tParam.Value = td.Time;
+            t1Param.Value = td.Temp1;
+            t2Param.Value = td.Temp2;
+            tsParam.Value = td.TempSurface;
+            tcParam.Value = td.TempCenter;
+            tcalParam.Value = td.TempCalibration;
+            cmd.ExecuteNonQuery();
+        }
+        txn.Commit();
+    }
+
+    /// <summary>查询某次试验的温度数据</summary>
+    public List<TemperatureData> GetTemperatureData(string productId, string testId)
+    {
+        var results = new List<TemperatureData>();
+        using var conn = CreateConnection();
+        using var cmd = new SqliteCommand(
+            "SELECT time, temp1, temp2, tempsurface, tempcenter, tempcalibration FROM temperaturedata WHERE productid = @pid AND testid = @tid ORDER BY time ASC", conn);
+        cmd.Parameters.AddWithValue("@pid", productId);
+        cmd.Parameters.AddWithValue("@tid", testId);
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            results.Add(new TemperatureData
+            {
+                Time = reader.GetInt32(0),
+                Temp1 = reader.GetDouble(1),
+                Temp2 = reader.GetDouble(2),
+                TempSurface = reader.GetDouble(3),
+                TempCenter = reader.GetDouble(4),
+                TempCalibration = reader.GetDouble(5)
+            });
+        }
+        return results;
+    }
 }

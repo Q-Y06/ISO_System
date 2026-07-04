@@ -77,6 +77,18 @@ public static class DbInitializer
                 referencetemp REAL,
                 measuredtemp REAL,
                 deviation REAL
+            )",
+            @"CREATE TABLE IF NOT EXISTS temperaturedata (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                productid TEXT NOT NULL,
+                testid TEXT NOT NULL,
+                time INTEGER NOT NULL,
+                temp1 REAL,
+                temp2 REAL,
+                tempsurface REAL,
+                tempcenter REAL,
+                tempcalibration REAL,
+                FOREIGN KEY (productid, testid) REFERENCES testmaster(productid, testid)
             )"
         };
 

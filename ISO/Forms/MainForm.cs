@@ -439,13 +439,15 @@ public partial class MainForm : Form
             MinorGridlineColor = OxyColor.FromRgb(230, 230, 230)
         });
 
-        // Y 轴（虚线网格）
+        // Y 轴（虚线网格），初始范围 0~800，运行时自动缩放
         plotModel.Axes.Add(new LinearAxis
         {
             Position = AxisPosition.Left,
             Title = "温度 (°C)",
             Minimum = 0,
             Maximum = 800,
+            MinimumPadding = 0.05,
+            MaximumPadding = 0.05,
             TextColor = OxyColor.FromRgb(60, 60, 60),
             TitleColor = OxyColor.FromRgb(60, 60, 60),
             AxislineColor = OxyColors.Gray,
@@ -565,6 +567,8 @@ public partial class MainForm : Form
         seriesTC.Points.Clear();
         plotModel.Axes[0].Minimum = 0;
         plotModel.Axes[0].Maximum = 600;
+        plotModel.Axes[1].Minimum = 0;
+        plotModel.Axes[1].Maximum = 800;
         _tickCounter = 0;
         plotModel.InvalidatePlot(true);
     }
@@ -578,9 +582,9 @@ public partial class MainForm : Form
         var topPanel = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = ThemeColors.BgLight };
 
         topPanel.Controls.Add(new Label { Text = "开始:", ForeColor = ThemeColors.TextPrimary, Location = new Point(10, 15), Size = new Size(40, 22) });
-        dtpStart = new DateTimePicker { Location = new Point(50, 12), Size = new Size(120, 24), Format = DateTimePickerFormat.Short };
+        dtpStart = new DateTimePicker { Location = new Point(50, 12), Size = new Size(120, 24), Format = DateTimePickerFormat.Short, Value = DateTime.Now.AddDays(-30) };
         topPanel.Controls.Add(new Label { Text = "结束:", ForeColor = ThemeColors.TextPrimary, Location = new Point(180, 15), Size = new Size(40, 22) });
-        dtpEnd = new DateTimePicker { Location = new Point(220, 12), Size = new Size(120, 24), Format = DateTimePickerFormat.Short };
+        dtpEnd = new DateTimePicker { Location = new Point(220, 12), Size = new Size(120, 24), Format = DateTimePickerFormat.Short, Value = DateTime.Now };
         topPanel.Controls.Add(new Label { Text = "样品:", ForeColor = ThemeColors.TextPrimary, Location = new Point(350, 15), Size = new Size(40, 22) });
         txtQueryProduct = new TextBox { Location = new Point(390, 12), Size = new Size(100, 24) };
         topPanel.Controls.Add(new Label { Text = "操作员:", ForeColor = ThemeColors.TextPrimary, Location = new Point(500, 15), Size = new Size(55, 22) });
@@ -866,13 +870,14 @@ public partial class MainForm : Form
         if (!double.IsNaN(e.Drift)) lblDrift.Text = $"温漂: {e.Drift:F2} °C/10min";
         if (_tc.CurrentTest != null) lblSample.Text = $"样品: {_tc.CurrentTest.ProductId}";
 
-        // 更新曲线数据
-        double t = _tc.State == TestState.Recording ? e.ElapsedSeconds : seriesTF1.Points.Count + 1;
+        // 更新曲线数据（连续时间，不随记录开始而重置）
+        double t = seriesTF1.Points.Count + 1;
         seriesTF1.Points.Add(new DataPoint(t, temps["TF1"]));
         seriesTF2.Points.Add(new DataPoint(t, temps["TF2"]));
         seriesTS.Points.Add(new DataPoint(t, temps["TS"]));
         seriesTC.Points.Add(new DataPoint(t, temps["TC"]));
 
+        // X轴滚动（超过600秒后跟随数据滚动）
         bool axisChanged = false;
         if (t > 600)
         {
@@ -884,9 +889,36 @@ public partial class MainForm : Form
         foreach (var s in new[] { seriesTF1, seriesTF2, seriesTS, seriesTC })
             while (s.Points.Count > 800) s.Points.RemoveAt(0);
 
-        // 轴变了或每60次tick才全刷新，否则只重绘（流畅不卡）
         _tickCounter++;
         bool fullRefresh = axisChanged || (_tickCounter % 60 == 0);
+
+        // Y轴自动缩放：根据实际数据范围动态调整，避免曲线被压平
+        if (fullRefresh)
+        {
+            double allMin = double.MaxValue, allMax = double.MinValue;
+            foreach (var s in new[] { seriesTF1, seriesTF2, seriesTS, seriesTC })
+            {
+                if (!s.IsVisible || s.Points.Count < 2) continue;
+                foreach (var pt in s.Points)
+                {
+                    if (pt.Y < allMin) allMin = pt.Y;
+                    if (pt.Y > allMax) allMax = pt.Y;
+                }
+            }
+            if (allMin < allMax)
+            {
+                double yRange = allMax - allMin;
+                double yPad = Math.Max(yRange * 0.08, 10); // 上下各 8% 留白，至少 10°C
+                double yAxisMin = Math.Max(0, allMin - yPad);
+                double yAxisMax = allMax + yPad;
+                // 防止范围太小导致图表抖动
+                if (yAxisMax - yAxisMin < 40)
+                { yAxisMin = Math.Max(0, yAxisMin - 20); yAxisMax = yAxisMin + 40; }
+                plotModel.Axes[1].Minimum = yAxisMin;
+                plotModel.Axes[1].Maximum = yAxisMax;
+            }
+        }
+
         plotModel.InvalidatePlot(fullRefresh);
 
         // 日志消息
@@ -958,20 +990,25 @@ public partial class MainForm : Form
         using var dlg = new TestRecordForm(_tc.CurrentTest);
         if (dlg.ShowDialog() == DialogResult.OK)
         {
-            _tc.SaveTestRecord(dlg.PostWeight, dlg.HasFlame ? 1 : 0, dlg.FlameStartTime, dlg.FlameDuration, dlg.Remark);
-            var tm = _tc.CurrentTest;
-            var tempData = _tc.TemperatureHistory;
             try
             {
+                _tc.SaveTestRecord(dlg.PostWeight, dlg.HasFlame ? 1 : 0, dlg.FlameStartTime, dlg.FlameDuration, dlg.Remark);
+                var tm = _tc.CurrentTest;
+                var tempData = _tc.TemperatureHistory;
+                // 温度数据写入数据库
+                _ctx.Db.InsertTemperatureData(tm.ProductId, tm.TestId, tempData);
                 _ctx.ExportService.ExportCsv(tm, tempData);
                 _ctx.ExportService.ExportExcel(tm, tempData);
                 if (bool.TryParse(_ctx.Configuration["Report:EnablePdfExport"], out bool enablePdf) && enablePdf)
                     _ctx.ExportService.ExportPdf(tm, tempData);
                 MessageBox.Show("试验记录已保存，报告已生成。", "完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                // 自动刷新查询并跳转
+                RunQuery();
+                tabControl.SelectedTab = tabQuery;
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"导出报告失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"保存失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             _tc.ClearCurrentTest();
             UpdateButtonStates();

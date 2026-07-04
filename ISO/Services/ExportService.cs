@@ -191,8 +191,26 @@ public class ExportService
     private MemoryStream GenerateChartImage(List<TemperatureData> tempData)
     {
         var model = new PlotModel { Title = "温度曲线", TextColor = OxyColors.Black, PlotAreaBorderColor = OxyColors.Gray };
-        model.Axes.Add(new LinearAxis { Position = AxisPosition.Bottom, Title = "时间 (秒)", Minimum = 0, Maximum = tempData.Count + 10 });
-        model.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Title = "温度 (°C)", Minimum = 0, Maximum = 800 });
+
+        // 根据实际数据范围自动计算轴范围
+        double dataMinX = tempData.Count > 0 ? tempData[0].Time : 0;
+        double dataMaxX = tempData.Count > 0 ? tempData[^1].Time : 600;
+        double dataMinY = double.MaxValue, dataMaxY = double.MinValue;
+        foreach (var td in tempData)
+        {
+            dataMinY = Math.Min(dataMinY, Math.Min(Math.Min(td.Temp1, td.Temp2), Math.Min(td.TempSurface, td.TempCenter)));
+            dataMaxY = Math.Max(dataMaxY, Math.Max(Math.Max(td.Temp1, td.Temp2), Math.Max(td.TempSurface, td.TempCenter)));
+        }
+        if (dataMinY > dataMaxY) { dataMinY = 0; dataMaxY = 800; }
+        double yRange = dataMaxY - dataMinY;
+        double yPad = yRange > 1 ? yRange * 0.08 : 40;   // 5% 上下留白
+        double xRange = dataMaxX - dataMinX;
+        double xPad = xRange > 1 ? xRange * 0.03 : 10;
+
+        model.Axes.Add(new LinearAxis { Position = AxisPosition.Bottom, Title = "时间 (秒)",
+            Minimum = dataMinX - xPad, Maximum = dataMaxX + xPad });
+        model.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Title = "温度 (°C)",
+            Minimum = Math.Max(0, dataMinY - yPad), Maximum = dataMaxY + yPad });
 
         var seriesTF1 = new LineSeries { Title = "炉温1", Color = OxyColors.Red, StrokeThickness = 1.5, MarkerType = MarkerType.None };
         var seriesTF2 = new LineSeries { Title = "炉温2", Color = OxyColors.Orange, StrokeThickness = 1.5, MarkerType = MarkerType.None };

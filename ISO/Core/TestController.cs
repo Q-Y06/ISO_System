@@ -132,6 +132,7 @@ public class TestController
 
         if (secs >= targetDuration)
         {
+            if (CurrentTest != null) CurrentTest.TotalTestTime = secs;
             _daqWorker.AddMessage($"记录时间到达 {targetDuration} 秒，试验自动结束");
             Log.Information("试验自动结束: 到达目标时长 {Duration}s", targetDuration);
             TransitionTo(TestState.Complete);
@@ -144,6 +145,7 @@ public class TestController
             double maxDrift = _simConfig.MaxTemperatureDriftPerTenMinutes;
             if (!double.IsNaN(drift) && Math.Abs(drift) <= maxDrift)
             {
+                if (CurrentTest != null) CurrentTest.TotalTestTime = secs;
                 _daqWorker.AddMessage("满足终止条件，试验结束");
                 Log.Information("试验提前终止: 温漂={Drift:F2}°C/10min <= {Threshold}°C/10min", drift, maxDrift);
                 TransitionTo(TestState.Complete);
