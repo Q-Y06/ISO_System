@@ -867,7 +867,8 @@ public partial class MainForm : Form
         if (_tc.CurrentTest != null) lblSample.Text = $"样品: {_tc.CurrentTest.ProductId}";
 
         // 更新曲线数据
-        double t = _tc.State == TestState.Recording ? e.ElapsedSeconds : seriesTF1.Points.Count + 1;
+        // 统一使用 Points.Count+1 作为 X 轴，避免 Recording 后 ElapsedSeconds 归零导致曲线重叠
+        double t = seriesTF1.Points.Count + 1;
         seriesTF1.Points.Add(new DataPoint(t, temps["TF1"]));
         seriesTF2.Points.Add(new DataPoint(t, temps["TF2"]));
         seriesTS.Points.Add(new DataPoint(t, temps["TS"]));
@@ -943,6 +944,7 @@ public partial class MainForm : Form
         {
             _tc.CreateTest(dlg.TestMaster!, dlg.ProductMaster!);
             ClearChart();
+            ShowInitialTemperatures();  // 新建试验时刷新当前炉温显示
             if (_tc.State == TestState.Idle)
             {
                 _tc.StartHeating();
