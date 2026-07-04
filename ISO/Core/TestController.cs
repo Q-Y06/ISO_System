@@ -19,8 +19,6 @@ public class TestController
     private int _stableTickCount;
     private readonly List<double> _pidOutputQueue = new();
     private readonly List<double> _driftHistory = new(); // 只在稳定范围内累积，用于温漂计算
-    private ProductMaster? _currentProduct;
-    private int _recordingSequence = 1;
 
     public event EventHandler<string>? StateChanged;
 
@@ -208,8 +206,6 @@ public class TestController
     public void CreateTest(TestMaster test, ProductMaster product)
     {
         _db.InsertProduct(product);
-        _currentProduct = product;
-        _recordingSequence = 1;
         CurrentTest = test;
         _daqWorker.ResetElapsed();
         TemperatureHistory.Clear();
@@ -250,64 +246,9 @@ public class TestController
             CurrentTest.ProductId, CurrentTest.TestId, CurrentTest.LostWeightPer, CurrentTest.DeltaTf, CurrentTest.TotalTestTime);
     }
 
-    public void PrepareForNextRecording()
-    {
-        if (CurrentTest == null) return;
-
-        _recordingSequence++;
-
-        // 生成新的试验标识: 移除已有的 "-R{N}" 后缀，追加 "-R{新序号}"
-        string baseTestId = CurrentTest.TestId;
-        int dashIdx = baseTestId.LastIndexOf("-R");
-        if (dashIdx > 0 && int.TryParse(baseTestId[(dashIdx + 2)..], out _))
-            baseTestId = baseTestId[..dashIdx];
-        string newTestId = $"{baseTestId}-R{_recordingSequence}";
-
-        // 同步更新 ProductMaster 并写入数据库
-        if (_currentProduct != null)
-        {
-            _currentProduct.TestId = newTestId;
-            _db.InsertProduct(_currentProduct);
-        }
-
-        // 重置记录相关字段，保留试验基本参数
-        CurrentTest.TestId = newTestId;
-        CurrentTest.TestDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-        CurrentTest.TotalTestTime = 0;
-        CurrentTest.PostWeight = 0;
-        CurrentTest.LostWeight = 0;
-        CurrentTest.LostWeightPer = 0;
-        CurrentTest.DeltaTf = 0;
-        CurrentTest.DeltaTf1 = 0;
-        CurrentTest.DeltaTf2 = 0;
-        CurrentTest.DeltaTs = 0;
-        CurrentTest.DeltaTc = 0;
-        CurrentTest.FlameDuration = 0;
-        CurrentTest.FlameStartTime = 0;
-        CurrentTest.HasFlame = 0;
-        CurrentTest.Remark = "";
-        CurrentTest.Flag = "";
-
-        // 重置控制器状态
-        _daqWorker.ResetElapsed();
-        TemperatureHistory.Clear();
-        _stableTickCount = 0;
-        _pidOutputQueue.Clear();
-        _driftHistory.Clear();
-
-        if (State == TestState.Complete)
-            TransitionTo(TestState.Preparing);
-
-        Log.Information("准备下一次记录: 新试验标识={NewTestId} 记录序号={Seq}", newTestId, _recordingSequence);
-        _daqWorker.AddMessage($"准备下一次记录 — 新试验标识: {newTestId}");
-    }
-
-    /// <summary>完全清除当前试验（用户主动停止加热后新建试验时使用）</summary>
     public void ClearCurrentTest()
     {
         CurrentTest = null;
-        _currentProduct = null;
-        _recordingSequence = 1;
         _daqWorker.ResetElapsed();
         TemperatureHistory.Clear();
         _stableTickCount = 0;
